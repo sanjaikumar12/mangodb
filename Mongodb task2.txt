@@ -1,0 +1,100 @@
+
+users
+_id (ObjectId, primary key)
+name (string)
+email (string)
+password (string)
+role (string, either "student" or "mentor")
+
+codekata
+_id (ObjectId, primary key)
+user_id (ObjectId, references the users collection)
+problem_id (ObjectId, references the problems collection)
+solved (boolean)
+submission_date (date)
+
+problems
+_id (ObjectId, primary key)
+topic_id (ObjectId, references the topics collection)
+task_id (ObjectId, references the tasks collection)
+problem_statement (string)
+difficulty_level (string)
+
+topics
+_id (ObjectId, primary key)
+topic_name (string)
+description (string)
+
+tasks
+_id (ObjectId, primary key)
+task_name (string)
+description (string)
+
+topic_id (ObjectId, references the topics collection)
+company_drives
+_id (ObjectId, primary key)
+company_name (string)
+drive_date (date)
+students_appeared (array of ObjectId, references the users collection)
+
+attendance
+_id (ObjectId, primary key)
+user_id (ObjectId, references the users collection)
+attendance_date (date)
+is_present (boolean)
+mentors
+_id (ObjectId, primary key)
+user_id (ObjectId, references the users collection)
+mentees (array of ObjectId, references the users collection)
+
+
+Queries:
+
+
+db.topics.aggregate([
+  { $lookup: { from: "tasks", localField: "_id", foreignField: "topic_id", as: "tasks" } },
+  { $match: { "tasks.task_date": { $gte: ISODate("2020-10-01T00:00:00.000Z"), $lte: ISODate("2020-10-31T23:59:59.999Z") } } }
+])
+
+db.company_drives.find({ drive_date: { $gte: ISODate("2020-10-15T00:00:00.000Z"), $lte: ISODate("2020-10-31T23:59:59.999Z") } })
+
+db.company_drives.aggregate([
+  { $lookup: { from: "users", localField: "students_appeared", foreignField: "_id", as: "students" } },
+  { $unwind: "$students" },
+  { $project: { company_name: 1, student_name: "$students.name" } }
+])
+
+db.user_codekata.find({ user_id: <user_id>, solved: true }).count()
+
+db.codekata.countDocuments({ user_id: ObjectId("user_id"), solved: true })
+
+db.mentors.find({ mentee_count: { $gt: 15 } })
+
+db.users.aggregate([
+  {
+    $lookup: {
+      from: "attendance",
+      localField: "_id",
+      foreignField: "user_id",
+      as: "attendance"
+    }
+  },
+  {
+    $lookup: {
+      from: "tasks",
+      localField: "_id",
+      foreignField: "user_id",
+      as: "tasks"
+    }
+  },
+  {
+    $match: {
+      "attendance.date": { $gte: ISODate("2020-10-15T00:00:00.000Z"), $lte: ISODate("2020-10-31T00:00:00.000Z") },
+      "attendance.present": false,
+      "tasks.submitted": false
+    }
+  },
+  {
+    $count: "absent_and_not_submitted"
+  }
+])
